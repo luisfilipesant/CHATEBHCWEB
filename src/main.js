@@ -21,6 +21,11 @@ function createWindow(url = null) {
     }
   });
 
+  /* ── garante que o título continue com a versão após o HTML carregar ── */
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.setTitle(`Chat EBHC v${app.getVersion()}`);
+  });
+
   url ? mainWindow.loadURL(url)
       : mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
