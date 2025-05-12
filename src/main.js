@@ -4,7 +4,6 @@ const path = require('path');
 
 let mainWindow = null;
 let updateWindow = null;
-let installationTriggered = false;   // evita chamar quitAndInstall duas vezes
 
 /* ────────────── Cria janela principal ────────────── */
 function createWindow(url = null) {
@@ -18,8 +17,8 @@ function createWindow(url = null) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
-    },
+      webviewTag: true
+    }
   });
 
   mainWindow.webContents.on('did-finish-load', () =>
@@ -30,10 +29,7 @@ function createWindow(url = null) {
     ? mainWindow.loadURL(url)
     : mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
+  mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
 }
 
@@ -42,17 +38,11 @@ function attachSaveImageMenu(contents) {
   contents.on('context-menu', (_e, p) => {
     if (p.mediaType === 'image' && p.srcURL) {
       new Menu()
-        .append(
-          new MenuItem({
-            label: 'Salvar imagem como…',
-            click: () => contents.downloadURL(p.srcURL),
-          })
-        )
-        .popup({
-          window:
-            BrowserWindow.fromWebContents(contents) ||
-            BrowserWindow.getFocusedWindow(),
-        });
+        .append(new MenuItem({
+          label: 'Salvar imagem como…',
+          click: () => contents.downloadURL(p.srcURL)
+        }))
+        .popup({ window: BrowserWindow.fromWebContents(contents) || BrowserWindow.getFocusedWindow() });
     }
   });
 }
@@ -73,23 +63,7 @@ function wireDownloads() {
   });
 }
 
-/* ────────── Auto‑update robusto ────────── */
-function triggerInstall() {
-  if (installationTriggered) return;
-  installationTriggered = true;
-
-  if (updateWindow?.webContents) {
-    updateWindow.webContents.executeJavaScript(`
-      document.getElementById("status").innerText = "Instalando atualização…";
-      document.getElementById("progress").innerText = "Aguarde…";
-    `);
-  }
-
-  setTimeout(() => {
-    autoUpdater.quitAndInstall(false, true); // fecha, instala e reabre
-  }, 1000);
-}
-
+/* ────────── Auto‑update confiável ────────── */
 function initAutoUpdate() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -97,21 +71,14 @@ function initAutoUpdate() {
   autoUpdater.on('update-available', info => {
     console.log(`⬇️ Baixando v${info.version}…`);
 
-    mainWindow?.close(); // libera arquivos
+    mainWindow?.close();                // libera arquivos usados
 
     updateWindow = new BrowserWindow({
-      width: 420,
-      height: 220,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      closable: false,
-      frame: true,
-      alwaysOnTop: true,
-      center: true,
-      title: 'Atualizando…',
+      width: 420, height: 220, frame: true, alwaysOnTop: true,
+      center: true, resizable: false, minimizable: false, maximizable: false,
+      closable: false, title: 'Atualizando…',
       icon: path.join(__dirname, '../assets/icon.ico'),
-      webPreferences: { contextIsolation: true },
+      webPreferences: { contextIsolation: true }
     });
 
     updateWindow.loadURL(`data:text/html,
@@ -123,29 +90,37 @@ function initAutoUpdate() {
 
   autoUpdater.on('download-progress', p => {
     const pct = Math.floor(p.percent);
+    console.log(`📥 ${pct}%`);
     if (updateWindow?.webContents) {
       updateWindow.webContents.executeJavaScript(
-        `document.getElementById("progress").innerText="${pct}%";`
+        `document.getElementById('progress').innerText='${pct}%';`
       );
     }
-    // fallback: se atingir 100 % mas evento final não disparar
-    if (pct >= 100) triggerInstall();
   });
 
-  autoUpdater.on('update-downloaded', () => {
-    console.log('✅ Download concluído (evento disparou)');
-    triggerInstall(); // caminho normal
+  /* download concluído com sucesso */
+  autoUpdater.on('update-downloaded', info => {
+    console.log(`✅ v${info.version} baixada – instalando…`);
+
+    updateWindow?.webContents?.executeJavaScript(`
+      document.getElementById("status").innerText = "Instalando atualização…";
+      document.getElementById("progress").innerText = "Aguarde…";
+    `);
+
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(false, true);   // fecha, aplica patch e reabre
+    }, 1200);
   });
 
   autoUpdater.on('error', err => {
     console.error('⚠️ Auto‑update erro:', err);
     updateWindow?.webContents?.executeJavaScript(`
-      document.getElementById("status").innerText="Erro ao atualizar";
-      document.getElementById("progress").innerText="${err.message}";
+      document.getElementById("status").innerText = "Erro ao atualizar";
+      document.getElementById("progress").innerText = "${err.message}";
     `);
   });
 
-  autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdates();                // checa já na inicialização
 }
 
 /* ────── Inicialização ────── */
@@ -156,9 +131,5 @@ app.whenReady().then(() => {
 });
 
 /* ────── Boilerplate mac / Win ────── */
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
