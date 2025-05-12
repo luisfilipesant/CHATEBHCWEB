@@ -1,6 +1,6 @@
 {
   "name": "chat-ebhc-electron",
-  "version": "1.1.0",                
+  "version": "1.1.1",                
   "description": "Wrapper desktop para https://chat.ebhc.com.br",
   "author": "Luis Filipe",
   "license": "MIT",

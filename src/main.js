@@ -25,14 +25,19 @@ function createWindow(url = null) {
 
 /* ──────────────── Menu de contexto “Salvar imagem como…” ────────────── */
 function attachSaveImageMenu(contents) {
-  contents.on('context-menu', (_e, p) => {
-    if (p.mediaType === 'image' && p.srcURL) {
-      new Menu()
-        .append(new MenuItem({
+  contents.on('context-menu', (_e, params) => {
+    if (params.mediaType === 'image' && params.srcURL) {
+      const menu = new Menu();
+      menu.append(
+        new MenuItem({
           label: 'Salvar imagem como…',
-          click: () => contents.downloadURL(p.srcURL)
-        }))
-        .popup({ window: BrowserWindow.fromWebContents(contents) });
+          click: () => contents.downloadURL(params.srcURL)
+        })
+      );
+
+      /* tenta pegar a janela; se não achar, usa foco atual */
+      const win = BrowserWindow.fromWebContents(contents) || BrowserWindow.getFocusedWindow();
+      menu.popup({ window: win });
     }
   });
 }
