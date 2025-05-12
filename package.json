@@ -1,40 +1,60 @@
 {
-    "name": "chat-ebhc-electron",
-    "version": "1.0.0",
-    "description": "Wrapper desktop para https://chat.ebhc.com.br",
-    "main": "src/main.js",
-    "author": "Luis Filipe",
-    "license": "MIT",
-    "scripts": {
-        "start": "electron .",
-        "pack": "electron-builder --dir",
-        "build": "electron-builder --win --x64"
+  "name": "chat-ebhc-electron",
+  "version": "1.1.0",                
+  "description": "Wrapper desktop para https://chat.ebhc.com.br",
+  "author": "Luis Filipe",
+  "license": "MIT",
+  "main": "src/main.js",
+
+  
+  "scripts": {
+    "start":   "electron .",
+    "pack":    "electron-builder --dir",
+    "build":   "electron-builder --win --x64",
+    "release": "electron-builder --win --x64 --publish always"
+  },
+
+  
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+
+  
+  "devDependencies": {
+    "electron": "^27.1.2",
+    "electron-builder": "^24.13.2"
+  },
+
+  
+  "build": {
+    "appId": "br.ebhc.chat",
+    "productName": "Chat EBHC",
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "extraMetadata": { "main": "src/main.js" },
+
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": "nsis",
+      "publisherName": "Luis Filipe"
     },
-    "devDependencies": {
-        "electron": "^27.1.2",
-        "electron-builder": "^24.13.2"
+
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": true          
     },
-    "build": {
-        "appId": "br.ebhc.chat",
-        "productName": "Chat EBHC",
-        "files": [
-            "src/**/*",
-            "assets/**/*"
-        ],
-        "extraMetadata": {
-            "main": "src/main.js"
-        },
-        "win": {
-            "icon": "assets/icon.ico",
-            "target": "nsis"
-        },
-        "nsis": {
-            "oneClick": false,
-            "perMachine": false,
-            "allowToChangeInstallationDirectory": true
-        }
-    },
-    "dependencies": {
-        "electron-updater": "^6.6.2"
-    }
+
+    
+    "publish": [
+      {
+        "provider": "github",
+        "owner":   "luisfilipesant",
+        "repo":    "CHATEBHCWEB",
+        "private": false                    
+      }
+    ]
+  }
 }

@@ -1,14 +1,10 @@
 const {
-  app,
-  BrowserWindow,
-  session,
-  Menu,
-  MenuItem,
-  dialog,
+  app, BrowserWindow, session, Menu, MenuItem, dialog
 } = require('electron');
+const { autoUpdater } = require('electron-updater');   // ← NOVO
 const path = require('path');
 
-/* ─────────────── Cria janela (principal ou pop‑up) ─────────────── */
+/* ───────────────── Cria janela (principal ou pop‑up) ───────────────── */
 function createWindow(url = null) {
   const win = new BrowserWindow({
     width: 1280,
@@ -20,56 +16,67 @@ function createWindow(url = null) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
-    },
+      webviewTag: true
+    }
   });
-
   url ? win.loadURL(url) : win.loadFile(path.join(__dirname, 'index.html'));
   return win;
 }
 
-/* ─────────────── Menu de contexto “Salvar imagem como…” ────────── */
+/* ──────────────── Menu de contexto “Salvar imagem como…” ────────────── */
 function attachSaveImageMenu(contents) {
-  contents.on('context-menu', (_e, params) => {
-    if (params.mediaType === 'image' && params.srcURL) {
-      const menu = new Menu();
-      menu.append(
-        new MenuItem({
+  contents.on('context-menu', (_e, p) => {
+    if (p.mediaType === 'image' && p.srcURL) {
+      new Menu()
+        .append(new MenuItem({
           label: 'Salvar imagem como…',
-          click: () => contents.downloadURL(params.srcURL),
-        })
-      );
-      menu.popup({ window: BrowserWindow.fromWebContents(contents) });
+          click: () => contents.downloadURL(p.srcURL)
+        }))
+        .popup({ window: BrowserWindow.fromWebContents(contents) });
     }
   });
 }
 
-/* ─────────────── Ativa em TODO webContents + trata window.open ─── */
-app.on('web-contents-created', (_event, contents) => {
-  attachSaveImageMenu(contents);
-
-  // intercepta window.open
-  contents.setWindowOpenHandler(({ url }) => {
-    createWindow(url);            // cria nova janela com preload e menu
-    return { action: 'deny' };    // cancela janela padrão do Electron
-  });
+/* ───── Ativa em todo webContents + trata window.open para pop‑ups ───── */
+app.on('web-contents-created', (_e, c) => {
+  attachSaveImageMenu(c);
+  c.setWindowOpenHandler(({ url }) => (createWindow(url), { action: 'deny' }));
 });
 
-/* ─────────────── Diálogo “Salvar como…” para downloads ─────────── */
-app.whenReady().then(() => {
-  session.defaultSession.on('will-download', (event, item, wc) => {
+/* ─────────── Diálogo “Salvar como…” para qualquer download ──────────── */
+function wireDownloads() {
+  session.defaultSession.on('will-download', (e, item, wc) => {
     const win = BrowserWindow.fromWebContents(wc);
-    const filePath = dialog.showSaveDialogSync(win, {
+    const out = dialog.showSaveDialogSync(win, {
       title: 'Salvar arquivo',
-      defaultPath: item.getFilename(),
+      defaultPath: item.getFilename()
     });
-    filePath ? item.setSavePath(filePath) : item.cancel();
+    out ? item.setSavePath(out) : item.cancel();
   });
+}
 
-  createWindow();                 // janela principal
+/* ─────────── Auto‑update: verifica, baixa e instala em silêncio ─────── */
+function initAutoUpdate() {
+  autoUpdater.autoDownload = true;             // baixa sem perguntar
+  autoUpdater.autoInstallOnAppQuit = true;     // instala ao fechar app
+
+  autoUpdater
+    .on('checking-for-update',   () => console.log('🔎  Verificando nova versão…'))
+    .on('update-available',      i => console.log(`⬇️  Baixando v${i.version}…`))
+    .on('update-downloaded',     i => console.log(`✅  v${i.version} pronta – instalará na próxima abertura`))
+    .on('error',                 e => console.error('⚠️  Auto‑update error:', e));
+
+  autoUpdater.checkForUpdatesAndNotify();
+}
+
+/* ─────────── App READY ─────────── */
+app.whenReady().then(() => {
+  wireDownloads();
+  createWindow();
+  initAutoUpdate();                            // ← habilita o updater
 });
 
-/* ─────────────── Comportamento padrão de apps mac/Win ──────────── */
+/* ─────────── Boilerplate mac/Win ─────────── */
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
