@@ -4,9 +4,8 @@ const path = require('path');
 
 let mainWindow = null;
 let updateWindow = null;
-let installationTriggered = false;   // evita chamar quitAndInstall duas vezes
 
-/* ────────────── Cria janela principal ────────────── */
+/* ────────────── Cria janela principal ou pop‑up ────────────── */
 function createWindow(url = null) {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -18,8 +17,8 @@ function createWindow(url = null) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
-    },
+      webviewTag: true
+    }
   });
 
   mainWindow.webContents.on('did-finish-load', () =>
@@ -30,39 +29,28 @@ function createWindow(url = null) {
     ? mainWindow.loadURL(url)
     : mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
+  mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
 }
 
-/* ────── Menu “Salvar imagem como…” ────── */
+/* ────────────── Menu de contexto “Salvar imagem como…” ────────────── */
 function attachSaveImageMenu(contents) {
   contents.on('context-menu', (_e, p) => {
     if (p.mediaType === 'image' && p.srcURL) {
       new Menu()
-        .append(
-          new MenuItem({
-            label: 'Salvar imagem como…',
-            click: () => contents.downloadURL(p.srcURL),
-          })
-        )
-        .popup({
-          window:
-            BrowserWindow.fromWebContents(contents) ||
-            BrowserWindow.getFocusedWindow(),
-        });
+        .append(new MenuItem({ label: 'Salvar imagem como…', click: () => contents.downloadURL(p.srcURL) }))
+        .popup({ window: BrowserWindow.fromWebContents(contents) || BrowserWindow.getFocusedWindow() });
     }
   });
 }
 
+/* ───── Ativa menu em todos os webContents + trata window.open ───── */
 app.on('web-contents-created', (_e, c) => {
   attachSaveImageMenu(c);
   c.setWindowOpenHandler(({ url }) => (createWindow(url), { action: 'deny' }));
 });
 
-/* ────── “Salvar como…” para downloads regulares ────── */
+/* ─────────── Diálogo “Salvar como…” para downloads ─────────── */
 function wireDownloads() {
   session.defaultSession.on('will-download', (_e, item, wc) => {
     const out = dialog.showSaveDialogSync(
@@ -73,45 +61,25 @@ function wireDownloads() {
   });
 }
 
-/* ────────── Auto‑update robusto ────────── */
-function triggerInstall() {
-  if (installationTriggered) return;
-  installationTriggered = true;
-
-  if (updateWindow?.webContents) {
-    updateWindow.webContents.executeJavaScript(`
-      document.getElementById("status").innerText = "Instalando atualização…";
-      document.getElementById("progress").innerText = "Aguarde…";
-    `);
-  }
-
-  setTimeout(() => {
-    autoUpdater.quitAndInstall(false, true); // fecha, instala e reabre
-  }, 1000);
-}
-
+/* ─────────── Auto‑update: fecha, instala e reabre sozinho ─────────── */
 function initAutoUpdate() {
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = false; // controlaremos manualmente
+
+  autoUpdater.on('checking-for-update', () => console.log('🔎 Procurando atualização…'));
 
   autoUpdater.on('update-available', info => {
     console.log(`⬇️ Baixando v${info.version}…`);
 
-    mainWindow?.close(); // libera arquivos
+    // fecha a janela principal para evitar arquivo aberto em uso
+    if (mainWindow) { mainWindow.close(); }
 
     updateWindow = new BrowserWindow({
-      width: 420,
-      height: 220,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      closable: false,
-      frame: true,
-      alwaysOnTop: true,
-      center: true,
-      title: 'Atualizando…',
+      width: 420, height: 220, resizable: false, minimizable: false,
+      maximizable: false, closable: false, frame: true, alwaysOnTop: true,
+      center: true, title: 'Atualizando…',
       icon: path.join(__dirname, '../assets/icon.ico'),
-      webPreferences: { contextIsolation: true },
+      webPreferences: { contextIsolation: true }
     });
 
     updateWindow.loadURL(`data:text/html,
@@ -123,42 +91,53 @@ function initAutoUpdate() {
 
   autoUpdater.on('download-progress', p => {
     const pct = Math.floor(p.percent);
-    if (updateWindow?.webContents) {
+    console.log(`📥 ${pct}%`);
+    if (updateWindow?.webContents)
       updateWindow.webContents.executeJavaScript(
-        `document.getElementById("progress").innerText="${pct}%";`
+        `document.getElementById('progress').innerText='${pct}%';`
       );
-    }
-    // fallback: se atingir 100 % mas evento final não disparar
-    if (pct >= 100) triggerInstall();
   });
 
-  autoUpdater.on('update-downloaded', () => {
-    console.log('✅ Download concluído (evento disparou)');
-    triggerInstall(); // caminho normal
+  /* download concluído → instala imediatamente */
+  autoUpdater.on('update-downloaded', info => {
+    console.log(`✅ v${info.version} baixada – instalando…`);
+    if (updateWindow?.webContents) {
+      updateWindow.webContents.executeJavaScript(`
+        document.getElementById('status').innerText='Instalando atualização…';
+        document.getElementById('progress').innerText='Iniciando…';
+      `);
+    }
+
+    // pequena pausa para o usuário ver a mensagem
+    setTimeout(() => {
+      // fecha janela de status também
+      if (updateWindow) updateWindow.close();
+
+      // força instalação e reabertura
+      autoUpdater.quitAndInstall(false, true); // false=silent, true=forçar restart
+    }, 1500);
   });
 
   autoUpdater.on('error', err => {
     console.error('⚠️ Auto‑update erro:', err);
-    updateWindow?.webContents?.executeJavaScript(`
-      document.getElementById("status").innerText="Erro ao atualizar";
-      document.getElementById("progress").innerText="${err.message}";
-    `);
+    if (updateWindow?.webContents) {
+      updateWindow.webContents.executeJavaScript(`
+        document.getElementById('status').innerText='Erro ao atualizar';
+        document.getElementById('progress').innerText='${err.message}';
+      `);
+    }
   });
 
-  autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdates(); // sem notify – controlamos tudo
 }
 
-/* ────── Inicialização ────── */
+/* ─────────── App pronto ─────────── */
 app.whenReady().then(() => {
   wireDownloads();
   createWindow();
   initAutoUpdate();
 });
 
-/* ────── Boilerplate mac / Win ────── */
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+/* ─────────── Boilerplate mac / Win ─────────── */
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
