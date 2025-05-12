@@ -10,7 +10,7 @@ function createWindow(url = null) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: 'Chat EBHC',
+    title: `Chat EBHC v${app.getVersion()}`,
     icon: path.join(__dirname, '../assets/icon.ico'),
     autoHideMenuBar: true,
     webPreferences: {
