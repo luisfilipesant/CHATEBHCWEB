@@ -1,12 +1,12 @@
-const {
-  app, BrowserWindow, session, Menu, MenuItem, dialog
-} = require('electron');
-const { autoUpdater } = require('electron-updater');   // ← NOVO
+const { app, BrowserWindow, session, Menu, MenuItem, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
+
+let mainWindow = null;  // <- NOVO
 
 /* ───────────────── Cria janela (principal ou pop‑up) ───────────────── */
 function createWindow(url = null) {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: 'Chat EBHC',
@@ -19,8 +19,15 @@ function createWindow(url = null) {
       webviewTag: true
     }
   });
-  url ? win.loadURL(url) : win.loadFile(path.join(__dirname, 'index.html'));
-  return win;
+
+  url ? mainWindow.loadURL(url)
+      : mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  return mainWindow;
 }
 
 /* ──────────────── Menu de contexto “Salvar imagem como…” ────────────── */
