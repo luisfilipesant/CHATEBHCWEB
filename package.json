@@ -1,31 +1,24 @@
 {
   "name": "chat-ebhc-electron",
-  "version": "1.2.2",                
+  "version": "1.2.2",
   "description": "Wrapper desktop para https://chat.ebhc.com.br",
   "author": "Luis Filipe",
   "license": "MIT",
   "main": "src/main.js",
-
-  
   "scripts": {
-    "start":   "electron .",
-    "pack":    "electron-builder --dir",
-    "build":   "electron-builder --win --x64",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "build": "electron-builder --win --x64",
     "release": "electron-builder --win --x64 --publish always"
   },
-
-  
   "dependencies": {
+    "electron-log": "^5.4.0",
     "electron-updater": "^6.6.2"
   },
-
-  
   "devDependencies": {
     "electron": "^27.1.2",
     "electron-builder": "^24.13.2"
   },
-
-  
   "build": {
     "appId": "br.ebhc.chat",
     "productName": "Chat EBHC",
@@ -33,27 +26,25 @@
       "src/**/*",
       "assets/**/*"
     ],
-    "extraMetadata": { "main": "src/main.js" },
-
+    "extraMetadata": {
+      "main": "src/main.js"
+    },
     "win": {
       "icon": "assets/icon.ico",
       "target": "nsis",
       "publisherName": "Luis Filipe"
     },
-
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "differentialPackage": true          
+      "differentialPackage": true
     },
-
-    
     "publish": [
       {
         "provider": "github",
-        "owner":   "luisfilipesant",
-        "repo":    "CHATEBHCWEB",
-        "private": false                    
+        "owner": "luisfilipesant",
+        "repo": "CHATEBHCWEB",
+        "private": false
       }
     ]
   }
