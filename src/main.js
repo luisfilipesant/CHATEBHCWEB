@@ -62,29 +62,55 @@ function wireDownloads() {
 
 /* ─────────── Auto‑update: verifica, baixa e instala em silêncio ─────── */
 function initAutoUpdate() {
-  autoUpdater.autoDownload = true;             // baixa sem perguntar
-  autoUpdater.autoInstallOnAppQuit = true;     // instala ao fechar app
+  let updateWindow = null;
 
-  autoUpdater
-    .on('checking-for-update',   () => console.log('🔎  Verificando nova versão…'))
-    .on('update-available',      i => console.log(`⬇️  Baixando v${i.version}…`))
-    .on('update-downloaded',     i => console.log(`✅  v${i.version} pronta – instalará na próxima abertura`))
-    .on('error',                 e => console.error('⚠️  Auto‑update error:', e));
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('🔎 Verificando nova versão...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log(`⬇️ Baixando v${info.version}...`);
+
+    // Cria a janela de atualização
+    updateWindow = new BrowserWindow({
+      width: 400,
+      height: 200,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: false,
+      title: 'Atualizando...',
+      frame: true,
+      alwaysOnTop: true,
+      center: true,
+      icon: path.join(__dirname, '../assets/icon.ico'),
+      webPreferences: {
+        contextIsolation: true
+      }
+    });
+
+    updateWindow.loadURL(`data:text/html,
+      <html>
+        <head><title>Atualizando...</title></head>
+        <body style="display:flex;justify-content:center;align-items:center;height:100%;font-family:sans-serif;">
+          <h2>Atualizando app... aguarde</h2>
+        </body>
+      </html>`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`✅ v${info.version} baixada – instalará na próxima abertura`);
+    if (updateWindow) updateWindow.close();
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('⚠️ Erro no auto-update:', err);
+    if (updateWindow) updateWindow.close();
+  });
 
   autoUpdater.checkForUpdatesAndNotify();
 }
 
-/* ─────────── App READY ─────────── */
-app.whenReady().then(() => {
-  wireDownloads();
-  createWindow();
-  initAutoUpdate();                            // ← habilita o updater
-});
-
-/* ─────────── Boilerplate mac/Win ─────────── */
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
