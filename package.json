@@ -1,0 +1,40 @@
+{
+    "name": "chat-ebhc-electron",
+    "version": "1.0.0",
+    "description": "Wrapper desktop para https://chat.ebhc.com.br",
+    "main": "src/main.js",
+    "author": "Luis Filipe",
+    "license": "MIT",
+    "scripts": {
+        "start": "electron .",
+        "pack": "electron-builder --dir",
+        "build": "electron-builder --win --x64"
+    },
+    "devDependencies": {
+        "electron": "^27.1.2",
+        "electron-builder": "^24.13.2"
+    },
+    "build": {
+        "appId": "br.ebhc.chat",
+        "productName": "Chat EBHC",
+        "files": [
+            "src/**/*",
+            "assets/**/*"
+        ],
+        "extraMetadata": {
+            "main": "src/main.js"
+        },
+        "win": {
+            "icon": "assets/icon.ico",
+            "target": "nsis"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    },
+    "dependencies": {
+        "electron-updater": "^6.6.2"
+    }
+}
