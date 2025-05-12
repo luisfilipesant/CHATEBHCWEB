@@ -1,21 +1,15 @@
 const { app, BrowserWindow, session, Menu, MenuItem, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');       // 📒 log em arquivo
 const path = require('path');
 
-/* ─── logger opcional ─── */
-let log = console;
-try {
-  log = require('electron-log');
-  autoUpdater.logger = log;
-  autoUpdater.logger.transports.file.level = 'info';
-} catch {
-  console.warn('electron-log não instalado — usando console.log');
-}
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
 
 let mainWindow = null;
 let updateWindow = null;
 
-/* ───────── Cria janela principal ───────── */
+/* ───── Cria janela principal ───── */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -27,8 +21,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
-    },
+      webviewTag: true
+    }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
@@ -37,15 +31,12 @@ function createWindow() {
   );
 }
 
-/* ───── Menu salvar imagem ───── */
+/* ───── Menu de contexto imagem ───── */
 function attachSaveImageMenu(contents) {
   contents.on('context-menu', (_e, p) => {
     if (p.mediaType === 'image' && p.srcURL) {
       new Menu()
-        .append(new MenuItem({
-          label: 'Salvar imagem como…',
-          click: () => contents.downloadURL(p.srcURL),
-        }))
+        .append(new MenuItem({ label: 'Salvar imagem como…', click: () => contents.downloadURL(p.srcURL) }))
         .popup({ window: BrowserWindow.fromWebContents(contents) || BrowserWindow.getFocusedWindow() });
     }
   });
@@ -58,29 +49,26 @@ app.on('web-contents-created', (_e, c) => {
 
 /* ───── Download normal “Salvar como…” ───── */
 session.defaultSession.on('will-download', (_e, item, wc) => {
-  const out = dialog.showSaveDialogSync(
-    BrowserWindow.fromWebContents(wc),
-    { title: 'Salvar arquivo', defaultPath: item.getFilename() },
-  );
+  const out = dialog.showSaveDialogSync(BrowserWindow.fromWebContents(wc), {
+    title: 'Salvar arquivo', defaultPath: item.getFilename()
+  });
   out ? item.setSavePath(out) : item.cancel();
 });
 
-/* ───────── Auto‑update ───────── */
+/* ───── Auto‑update confiável ───── */
 function initAutoUpdate() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('update-available', info => {
-    log.info(`\u2193 Baixando ${info.version}`);
-
-    mainWindow?.hide();
-
+    log.info(`Update disponível: ${info.version}`);
+    mainWindow?.hide();                              // 👉 apenas OCULTA
     updateWindow = new BrowserWindow({
       width: 420, height: 220, resizable: false, frame: true,
       alwaysOnTop: true, center: true, closable: false,
       title: 'Atualizando…',
       icon: path.join(__dirname, '../assets/icon.ico'),
-      webPreferences: { contextIsolation: true },
+      webPreferences: { contextIsolation: true }
     });
 
     updateWindow.loadURL(`data:text/html,
@@ -92,26 +80,29 @@ function initAutoUpdate() {
 
   autoUpdater.on('download-progress', p => {
     const pct = Math.floor(p.percent);
-    log.info(`Progress ${pct}%`);
+    log.info(`Progress: ${pct}%`);
     updateWindow?.webContents?.executeJavaScript(
-      `document.getElementById('progress').innerText='${pct}%';`,
+      `document.getElementById('progress').innerText='${pct}%';`
     );
   });
 
   autoUpdater.on('update-downloaded', info => {
-    log.info(`Baixado ${info.version}, instalando`);
+    log.info(`Update baixado: ${info.version}`);
     updateWindow?.webContents?.executeJavaScript(`
-      document.getElementById("status").innerText="Instalando atualização…";
-      document.getElementById("progress").innerText="Aguarde…";
+      document.getElementById("status").innerText = "Instalando atualização…";
+      document.getElementById("progress").innerText = "Aguarde…";
     `);
-    setTimeout(() => autoUpdater.quitAndInstall(false, true), 1200);
+
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(false, true);       // fecha, aplica, reabre
+    }, 1000);
   });
 
   autoUpdater.on('error', err => {
-    log.error('Update erro', err);
+    log.error('Auto‑update erro', err);
     updateWindow?.webContents?.executeJavaScript(`
-      document.getElementById("status").innerText="Erro ao atualizar";
-      document.getElementById("progress").innerText="${err.message}";
+      document.getElementById("status").innerText = "Erro ao atualizar";
+      document.getElementById("progress").innerText = "${err.message}";
     `);
   });
 
@@ -122,9 +113,9 @@ function initAutoUpdate() {
 app.whenReady().then(() => {
   createWindow();
   initAutoUpdate();
-  log.info('App iniciado', app.getVersion());
+  log.info('Aplicativo iniciado – versão', app.getVersion());
 });
 
-/* ───── Boilerplate ───── */
+/* ───── Boilerplate mac/Win ───── */
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
