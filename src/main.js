@@ -2,8 +2,8 @@ const { app, BrowserWindow, session, Menu, MenuItem, dialog } = require('electro
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
-/* ────────────── Referência global da janela principal ────────────── */
 let mainWindow = null;
+let updateWindow = null;
 
 /* ────────────── Cria janela principal ou pop‑up ────────────── */
 function createWindow(url = null) {
@@ -65,10 +65,8 @@ function wireDownloads() {
   });
 }
 
-/* ─────────────── Auto‑update com tela de progresso ─────────────── */
+/* ─────────────── Auto‑update com barra de progresso ─────────────── */
 function initAutoUpdate() {
-  let updateWindow = null;
-
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -76,12 +74,12 @@ function initAutoUpdate() {
     console.log('🔎 Verificando nova versão...');
   });
 
-  autoUpdater.on('update-available', info => {
+  autoUpdater.on('update-available', (info) => {
     console.log(`⬇️ Baixando v${info.version}...`);
 
     updateWindow = new BrowserWindow({
-      width: 400,
-      height: 200,
+      width: 420,
+      height: 220,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -91,25 +89,61 @@ function initAutoUpdate() {
       alwaysOnTop: true,
       center: true,
       icon: path.join(__dirname, '../assets/icon.ico'),
-      webPreferences: { contextIsolation: true }
+      webPreferences: {
+        contextIsolation: true
+      }
     });
 
-    updateWindow.loadURL(`data:text/html,
+    updateWindow.loadURL(`data:text/html;charset=utf-8,
       <html>
-        <body style="display:flex;justify-content:center;align-items:center;height:100%;font-family:sans-serif;">
-          <h2>Atualizando app... aguarde</h2>
+        <head><meta charset="UTF-8"><title>Atualizando...</title></head>
+        <body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;font-family:sans-serif;">
+          <h2 id="status">Atualizando app... aguarde</h2>
+          <p id="progress" style="margin-top:1rem;font-size:16px;">0%</p>
         </body>
       </html>`);
   });
 
-  autoUpdater.on('update-downloaded', info => {
-    console.log(`✅ v${info.version} baixada – instalará na próxima abertura`);
-    if (updateWindow) updateWindow.close();
+  autoUpdater.on('download-progress', (progressObj) => {
+    const percent = Math.floor(progressObj.percent);
+    console.log(`📦 Download: ${percent}%`);
+
+    if (updateWindow && updateWindow.webContents) {
+      updateWindow.webContents.executeJavaScript(
+        `document.getElementById("progress").innerText = "${percent}%";`
+      );
+    }
   });
 
-  autoUpdater.on('error', err => {
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`✅ v${info.version} baixada – instalará na próxima abertura`);
+
+    if (updateWindow && updateWindow.webContents) {
+      updateWindow.webContents.executeJavaScript(`
+        document.getElementById("status").innerText = "Atualização concluída!";
+        document.getElementById("progress").innerText = "Reinicie o app para aplicar.";
+      `);
+    }
+
+    // Fecha o modal após 3 segundos
+    setTimeout(() => {
+      if (updateWindow) updateWindow.close();
+    }, 3000);
+  });
+
+  autoUpdater.on('error', (err) => {
     console.error('⚠️ Erro no auto-update:', err);
-    if (updateWindow) updateWindow.close();
+
+    if (updateWindow && updateWindow.webContents) {
+      updateWindow.webContents.executeJavaScript(`
+        document.getElementById("status").innerText = "Erro ao atualizar.";
+        document.getElementById("progress").innerText = "${err.message}";
+      `);
+    }
+
+    setTimeout(() => {
+      if (updateWindow) updateWindow.close();
+    }, 5000);
   });
 
   autoUpdater.checkForUpdatesAndNotify();
@@ -118,8 +152,8 @@ function initAutoUpdate() {
 /* ─────────────── App pronto ─────────────── */
 app.whenReady().then(() => {
   wireDownloads();
-  createWindow();     // cria a janela principal
-  initAutoUpdate();   // verifica atualizações
+  createWindow();
+  initAutoUpdate();
 });
 
 /* ─────────────── Boilerplate mac / Win ─────────────── */
